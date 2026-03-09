@@ -40,11 +40,11 @@ export default async function handler(req, res) {
       }
     );
 
-    const data = await response.json();
+    const text = await response.text();   // safer than response.json()
 
     return res.status(200).json({
       success: true,
-      data
+      shopify_response: text
     });
 
   } catch (error) {
