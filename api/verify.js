@@ -10,7 +10,9 @@ export default async function handler(req, res) {
 
   try {
 
-    const { name, email, phone, order_id, code } = req.body;
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+
+    const { name, email, phone, order_id, code } = body;
 
     const SHOP = process.env.SHOPIFY_STORE;
     const TOKEN = process.env.SHOPIFY_ADMIN_TOKEN;
@@ -40,14 +42,14 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data
     });
 
   } catch (error) {
 
-    res.status(500).json({
+    return res.status(500).json({
       error: error.message
     });
 
