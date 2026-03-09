@@ -17,28 +17,28 @@ export default async function handler(req, res) {
     const SHOP = process.env.SHOPIFY_STORE;
     const TOKEN = process.env.SHOPIFY_ADMIN_TOKEN;
 
-    const query = `
-      mutation {
-        metaobjectCreate(metaobject: {
-          type: "amazon_verification"
-          fields: [
-            { key: "name", value: "${name}" }
-            { key: "email", value: "${email}" }
-            { key: "phone", value: "${phone}" }
-            { key: "order_id", value: "${order_id}" }
-            { key: "code", value: "${code}" }
-          ]
-        }) {
-          metaobject {
-            id
-          }
-          userErrors {
-            field
-            message
-          }
-        }
-      }
-    `;
+   const query = `
+mutation {
+  metaobjectCreate(metaobject: {
+    type: "amazon_verification"
+    fields: [
+      { key: "name", value: "${name}" }
+      { key: "email", value: "${email}" }
+      { key: "phone", value: "${phone}" }
+      { key: "amazon_order_id", value: "${order_id}" }
+      { key: "verification_code", value: "${code}" }
+    ]
+  }) {
+    metaobject {
+      id
+    }
+    userErrors {
+      field
+      message
+    }
+  }
+}
+`;
 
     const response = await fetch(
       `https://${SHOP}/admin/api/2024-01/graphql.json`,
