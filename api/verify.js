@@ -4,7 +4,6 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  // handle preflight request
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
@@ -17,12 +16,23 @@ export default async function handler(req, res) {
 
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
 
-    const { name, email, phone, order_id, code } = body;
+    const {
+      name,
+      email,
+      phone,
+      order_id,
+      marketplace,
+      reward,
+      screenshot,
+      code
+    } = body;
 
     const SHOP = process.env.SHOPIFY_STORE;
     const TOKEN = process.env.SHOPIFY_ADMIN_TOKEN;
 
-   const query = `
+    const createdAt = new Date().toISOString();
+
+    const query = `
 mutation {
   metaobjectCreate(metaobject: {
     type: "amazon_verification"
@@ -31,7 +41,11 @@ mutation {
       { key: "email", value: "${email}" }
       { key: "phone", value: "${phone}" }
       { key: "amazon_order_id", value: "${order_id}" }
+      { key: "marketplace", value: "${marketplace}" }
+      { key: "reward", value: "${reward}" }
       { key: "verification_code", value: "${code}" }
+      { key: "status", value: "pending" }
+      { key: "created_at", value: "${createdAt}" }
     ]
   }) {
     metaobject {
