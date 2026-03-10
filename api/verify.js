@@ -33,31 +33,36 @@ export default async function handler(req, res) {
     const createdAt = new Date().toISOString();
 
     const query = `
-mutation {
-  metaobjectCreate(metaobject: {
-    type: "amazon_verification"
-    fields: [
-      { key: "name", value: "${name}" }
-      { key: "email", value: "${email}" }
-      { key: "phone", value: "${phone}" }
-      { key: "amazon_order_id", value: "${order_id}" }
-      { key: "marketplace", value: "${marketplace}" }
-      { key: "reward", value: "${reward}" }
-      { key: "verification_code", value: "${code}" }
-      { key: "status", value: "pending" }
-      { key: "created_at", value: "${createdAt}" }
-    ]
-  }) {
-    metaobject {
-      id
-    }
-    userErrors {
-      field
-      message
-    }
-  }
-}
-`;
+      mutation metaobjectCreate($metaobject: MetaobjectCreateInput!) {
+        metaobjectCreate(metaobject: $metaobject) {
+          metaobject {
+            id
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
+
+    const variables = {
+      metaobject: {
+        type: "amazon_verification",
+        fields: [
+          { key: "name", value: name },
+          { key: "email", value: email },
+          { key: "phone", value: phone },
+          { key: "order_id", value: order_id },
+          { key: "marketplace", value: marketplace },
+          { key: "reward", value: reward },
+          { key: "screenshot", value: screenshot },
+          { key: "verification_code", value: code },
+          { key: "status", value: "pending" },
+          { key: "created_at", value: createdAt }
+        ]
+      }
+    };
 
     const response = await fetch(
       `https://${SHOP}/admin/api/2024-01/graphql.json`,
@@ -67,20 +72,22 @@ mutation {
           "X-Shopify-Access-Token": TOKEN,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ query })
+        body: JSON.stringify({
+          query,
+          variables
+        })
       }
     );
 
     const data = await response.json();
 
+    console.log(JSON.stringify(data, null, 2));
+
     return res.status(200).json(data);
 
   } catch (error) {
-
     return res.status(500).json({
       error: error.message
     });
-
   }
-
 }
