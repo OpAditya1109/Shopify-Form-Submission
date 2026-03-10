@@ -67,7 +67,7 @@ export default async function handler(req, res) {
           { key: "name", value: name },
           { key: "email", value: email },
           { key: "phone", value: phone },
-          { key: "amazon_order_id", value: order_id },
+          { key: "order_id", value: order_id },
           { key: "marketplace", value: marketplace },
           { key: "reward", value: reward },
           { key: "screenshot", value: screenshotUrl },
