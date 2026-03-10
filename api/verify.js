@@ -282,7 +282,7 @@ export default async function handler(req, res) {
           { key: "order_id", value: String(order_id) },
           { key: "marketplace", value: String(marketplace) },
           { key: "reward", value: String(reward) },
-          { key: "upi", value: upi ? String(upi) : "" },
+          { key: "upi_id", value: upi ? String(upi) : "" },
           { key: "screenshot", value: screenshotUrl },
           { key: "status", value: "pending" },
           { key: "created_at", value: createdAt }
