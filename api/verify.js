@@ -6,7 +6,6 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-
 /* -----------------------------
  FIND CUSTOMER BY EMAIL
 ----------------------------- */
@@ -40,7 +39,7 @@ async function findCustomerByEmail(email, SHOP, TOKEN) {
 
   const data = await response.json();
 
-  return data?.data?.customers?.edges[0]?.node || null;
+  return data?.data?.customers?.edges?.[0]?.node || null;
 }
 
 
@@ -74,8 +73,8 @@ async function createCustomer(name, email, phone, marketplace, reward, SHOP, TOK
 
   const variables = {
     input: {
-      firstName: first,
-      lastName: last,
+      firstName: first || "",
+      lastName: last || "",
       email,
       phone,
       tags
@@ -95,6 +94,10 @@ async function createCustomer(name, email, phone, marketplace, reward, SHOP, TOK
   );
 
   const data = await response.json();
+
+  if (data?.data?.customerCreate?.userErrors?.length) {
+    console.error("Customer create error:", data.data.customerCreate.userErrors);
+  }
 
   return data?.data?.customerCreate?.customer?.id;
 }
@@ -127,6 +130,8 @@ async function updateMarketplaceMetafield(customerId, marketplace, SHOP, TOKEN) 
       value: "true"
     });
   }
+
+  if (metafields.length === 0) return;
 
   const mutation = `
   mutation metafieldsSet($metafields:[MetafieldsSetInput!]!) {
@@ -256,9 +261,9 @@ export default async function handler(req, res) {
      CREATE METAOBJECT RECORD
     ----------------------------- */
 
-    const createdAt = new Date().toISOString();
+    const createdAt = new Date().toISOString().split('.')[0] + "Z";
 
-    const query = `
+    const mutation = `
       mutation metaobjectCreate($metaobject: MetaobjectCreateInput!) {
         metaobjectCreate(metaobject: $metaobject) {
           metaobject { id }
@@ -271,13 +276,13 @@ export default async function handler(req, res) {
       metaobject: {
         type: "amazon_verification",
         fields: [
-          { key: "name", value: name },
-          { key: "email", value: email },
-          { key: "phone", value: phone },
-          { key: "order_id", value: order_id },
-          { key: "marketplace", value: marketplace },
-          { key: "reward", value: reward },
-          { key: "upi", value: upi || "" },
+          { key: "name", value: String(name) },
+          { key: "email", value: String(email) },
+          { key: "phone", value: String(phone) },
+          { key: "order_id", value: String(order_id) },
+          { key: "marketplace", value: String(marketplace) },
+          { key: "reward", value: String(reward) },
+          { key: "upi", value: upi ? String(upi) : "" },
           { key: "screenshot", value: screenshotUrl },
           { key: "status", value: "pending" },
           { key: "created_at", value: createdAt }
@@ -293,18 +298,33 @@ export default async function handler(req, res) {
           "X-Shopify-Access-Token": TOKEN,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ query, variables })
+        body: JSON.stringify({
+          query: mutation,
+          variables
+        })
       }
     );
 
     const data = await response.json();
 
+    if (data?.data?.metaobjectCreate?.userErrors?.length) {
+
+      console.error("Metaobject error:", data.data.metaobjectCreate.userErrors);
+
+      return res.status(400).json({
+        error: data.data.metaobjectCreate.userErrors
+      });
+
+    }
+
     return res.status(200).json({
       success: true,
-      data
+      metaobjectId: data?.data?.metaobjectCreate?.metaobject?.id
     });
 
   } catch (error) {
+
+    console.error(error);
 
     return res.status(500).json({
       error: error.message
