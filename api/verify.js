@@ -31,8 +31,7 @@ export default async function handler(req, res) {
       order_id,
       marketplace,
       reward,
-      screenshot,
-      code
+      screenshot
     } = body;
 
     const SHOP = process.env.SHOPIFY_STORE;
@@ -71,7 +70,6 @@ export default async function handler(req, res) {
           { key: "marketplace", value: marketplace },
           { key: "reward", value: reward },
           { key: "screenshot", value: screenshotUrl },
-          { key: "verification_code", value: code },
           { key: "status", value: "pending" },
           { key: "created_at", value: createdAt }
         ]
@@ -91,8 +89,6 @@ export default async function handler(req, res) {
     );
 
     const data = await response.json();
-
-    console.log(JSON.stringify(data, null, 2));
 
     return res.status(200).json(data);
 
