@@ -125,7 +125,7 @@ async function updateMarketplaceMetafield(customerId, marketplace, SHOP, TOKEN) 
     metafields.push({
       ownerId: customerId,
       namespace: "custom",
-      key: "amazon_customer",
+      key: "amazon_customer_N",
       type: "boolean",
       value: "true"
     });
