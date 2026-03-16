@@ -6,13 +6,12 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
+
 /* -----------------------------
  FIND CUSTOMER BY EMAIL
 ----------------------------- */
 
 async function findCustomerByEmail(email, SHOP, TOKEN) {
-
-  console.log("Checking if customer exists:", email);
 
   const query = `
   {
@@ -21,6 +20,7 @@ async function findCustomerByEmail(email, SHOP, TOKEN) {
         node {
           id
           email
+          phone
         }
       }
     }
@@ -41,7 +41,43 @@ async function findCustomerByEmail(email, SHOP, TOKEN) {
 
   const data = await response.json();
 
-  console.log("Customer search response:", JSON.stringify(data));
+  return data?.data?.customers?.edges?.[0]?.node || null;
+}
+
+
+/* -----------------------------
+ FIND CUSTOMER BY PHONE
+----------------------------- */
+
+async function findCustomerByPhone(phone, SHOP, TOKEN) {
+
+  const query = `
+  {
+    customers(first: 1, query: "phone:${phone}") {
+      edges {
+        node {
+          id
+          email
+          phone
+        }
+      }
+    }
+  }
+  `;
+
+  const response = await fetch(
+    `https://${SHOP}/admin/api/2024-01/graphql.json`,
+    {
+      method: "POST",
+      headers: {
+        "X-Shopify-Access-Token": TOKEN,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ query })
+    }
+  );
+
+  const data = await response.json();
 
   return data?.data?.customers?.edges?.[0]?.node || null;
 }
@@ -52,8 +88,6 @@ async function findCustomerByEmail(email, SHOP, TOKEN) {
 ----------------------------- */
 
 async function createCustomer(name, email, phone, marketplace, reward, SHOP, TOKEN) {
-
-  console.log("Creating Shopify customer...");
 
   const [first, ...rest] = name.split(" ");
   const last = rest.join(" ");
@@ -101,10 +135,12 @@ async function createCustomer(name, email, phone, marketplace, reward, SHOP, TOK
 
   const data = await response.json();
 
-  console.log("Customer create response:", JSON.stringify(data));
-
   if (data?.data?.customerCreate?.userErrors?.length) {
-    console.error("Customer create error:", data.data.customerCreate.userErrors);
+    throw new Error(
+      data.data.customerCreate.userErrors
+        .map(e => e.message)
+        .join(", ")
+    );
   }
 
   return data?.data?.customerCreate?.customer?.id;
@@ -112,12 +148,10 @@ async function createCustomer(name, email, phone, marketplace, reward, SHOP, TOK
 
 
 /* -----------------------------
- UPDATE MARKETPLACE METAFIELDS
+ UPDATE MARKETPLACE METAFIELD
 ----------------------------- */
 
 async function updateMarketplaceMetafield(customerId, marketplace, SHOP, TOKEN) {
-
-  console.log("Updating metafield for customer:", customerId);
 
   let metafields = [];
 
@@ -141,6 +175,8 @@ async function updateMarketplaceMetafield(customerId, marketplace, SHOP, TOKEN) 
     });
   }
 
+  if (!metafields.length) return;
+
   const mutation = `
   mutation metafieldsSet($metafields:[MetafieldsSetInput!]!) {
     metafieldsSet(metafields:$metafields) {
@@ -150,7 +186,7 @@ async function updateMarketplaceMetafield(customerId, marketplace, SHOP, TOKEN) 
   }
   `;
 
-  const response = await fetch(
+  await fetch(
     `https://${SHOP}/admin/api/2024-01/graphql.json`,
     {
       method: "POST",
@@ -164,10 +200,6 @@ async function updateMarketplaceMetafield(customerId, marketplace, SHOP, TOKEN) 
       })
     }
   );
-
-  const data = await response.json();
-
-  console.log("Metafield update response:", JSON.stringify(data));
 }
 
 
@@ -176,13 +208,6 @@ async function updateMarketplaceMetafield(customerId, marketplace, SHOP, TOKEN) 
 ----------------------------- */
 
 export default async function handler(req, res) {
-
-  console.log("API CALLED");
-
-  console.log("ENV CHECK");
-  console.log("SHOP:", process.env.SHOPIFY_STORE);
-  console.log("TOKEN EXISTS:", !!process.env.SHOPIFY_ADMIN_TOKEN);
-  console.log("CLOUDINARY:", !!process.env.CLOUDINARY_CLOUD_NAME);
 
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -202,8 +227,6 @@ export default async function handler(req, res) {
       ? JSON.parse(req.body)
       : req.body;
 
-    console.log("Incoming request body:", body);
-
     const {
       name,
       email,
@@ -221,36 +244,35 @@ export default async function handler(req, res) {
     let screenshotUrl = "";
 
     /* -----------------------------
-     Upload screenshot to Cloudinary
+     Upload screenshot
     ----------------------------- */
 
     if (screenshot) {
-
-      console.log("Uploading screenshot to Cloudinary");
 
       const upload = await cloudinary.uploader.upload(screenshot, {
         folder: "wellbi-reviews"
       });
 
       screenshotUrl = upload.secure_url;
-
-      console.log("Screenshot uploaded:", screenshotUrl);
-
     }
+
 
     /* -----------------------------
      CUSTOMER LOGIC
     ----------------------------- */
 
-    const existingCustomer = await findCustomerByEmail(email, SHOP, TOKEN);
+    let customer = await findCustomerByEmail(email, SHOP, TOKEN);
+
+    if (!customer) {
+      customer = await findCustomerByPhone(phone, SHOP, TOKEN);
+    }
 
     let customerId;
 
-    if (existingCustomer) {
+    if (customer) {
 
-      console.log("Existing customer found:", existingCustomer.id);
-
-      customerId = existingCustomer.id;
+      customerId = customer.id;
+      console.log("Using existing customer:", customerId);
 
     } else {
 
@@ -267,11 +289,15 @@ export default async function handler(req, res) {
       );
 
       console.log("Customer created:", customerId);
-
     }
 
+    if (!customerId) {
+      throw new Error("Customer ID missing. Cannot continue.");
+    }
+
+
     /* -----------------------------
-     UPDATE MARKETPLACE METAFIELD
+     UPDATE METAFIELD
     ----------------------------- */
 
     await updateMarketplaceMetafield(
@@ -281,10 +307,9 @@ export default async function handler(req, res) {
       TOKEN
     );
 
-    console.log("Metafield updated");
 
     /* -----------------------------
-     CREATE METAOBJECT RECORD
+     CREATE METAOBJECT
     ----------------------------- */
 
     const createdAt = new Date().toISOString().split('.')[0] + "Z";
@@ -316,8 +341,6 @@ export default async function handler(req, res) {
       }
     };
 
-    console.log("Creating metaobject...");
-
     const response = await fetch(
       `https://${SHOP}/admin/api/2024-01/graphql.json`,
       {
@@ -335,19 +358,11 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
-    console.log("Metaobject response:", JSON.stringify(data));
-
     if (data?.data?.metaobjectCreate?.userErrors?.length) {
-
-      console.error("Metaobject error:", data.data.metaobjectCreate.userErrors);
-
       return res.status(400).json({
         error: data.data.metaobjectCreate.userErrors
       });
-
     }
-
-    console.log("Metaobject created successfully");
 
     return res.status(200).json({
       success: true,
@@ -363,5 +378,4 @@ export default async function handler(req, res) {
     });
 
   }
-
 }
